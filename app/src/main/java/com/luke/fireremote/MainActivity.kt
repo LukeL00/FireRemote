@@ -13,6 +13,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -142,7 +144,7 @@ private fun RemoteScreen(client: FireTvClient) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             RoundButton(Icons.Default.PowerSettingsNew, "Power", tint = Color(0xFFFF453A)) { key(Keys.POWER) }
             RoundButton(Icons.Default.Keyboard, "Type") { showType = true }
-            RoundButton(Icons.AutoMirrored.Filled.VolumeOff, "Mute") { key(Keys.MUTE) }
+            RoundButton(Icons.Default.VolumeOff, "Mute") { key(Keys.MUTE) }
         }
 
         // App shortcuts
@@ -178,8 +180,8 @@ private fun RemoteScreen(client: FireTvClient) {
 
         // Volume
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PillButton(Icons.AutoMirrored.Filled.VolumeDown, "Vol –", Modifier.weight(1f)) { key(Keys.VOL_DOWN) }
-            PillButton(Icons.AutoMirrored.Filled.VolumeUp, "Vol +", Modifier.weight(1f)) { key(Keys.VOL_UP) }
+            PillButton(Icons.Default.VolumeDown, "Vol –", Modifier.weight(1f)) { key(Keys.VOL_DOWN) }
+            PillButton(Icons.Default.VolumeUp, "Vol +", Modifier.weight(1f)) { key(Keys.VOL_UP) }
         }
     }
 
