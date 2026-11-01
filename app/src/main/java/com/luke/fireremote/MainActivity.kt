@@ -40,6 +40,7 @@ private val SurfaceHi = Color(0xFF2B2D35)
 private val Accent = Color(0xFFFF9900)
 private val YouTubeRed = Color(0xFFFF0033)
 private val NetflixRed = Color(0xFFE50914)
+private val DisneyBlue = Color(0xFF0B2A6F)
 
 class MainActivity : ComponentActivity() {
     private lateinit var client: FireTvClient
@@ -149,12 +150,15 @@ private fun RemoteScreen(client: FireTvClient) {
         }
 
         // App shortcuts
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             AppButton("YouTube", YouTubeRed, Color.White, Modifier.weight(1f)) {
                 send { client.launchApp("YouTube", FireTvClient.Apps.YOUTUBE, "youtube") }
             }
             AppButton("NETFLIX", Color.Black, NetflixRed, Modifier.weight(1f)) {
                 send { client.launchApp("Netflix", FireTvClient.Apps.NETFLIX, "netflix") }
+            }
+            AppButton("Disney+", DisneyBlue, Color.White, Modifier.weight(1f)) {
+                send { client.launchApp("Disney+", FireTvClient.Apps.DISNEY, "disney") }
             }
         }
 
@@ -250,9 +254,10 @@ private fun AppButton(label: String, bg: Color, fg: Color, modifier: Modifier, o
         onClick = onClick,
         modifier = modifier.height(64.dp),
         shape = RoundedCornerShape(16.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp),
         colors = ButtonDefaults.buttonColors(containerColor = bg, contentColor = fg)
     ) {
-        Text(label, fontWeight = FontWeight.Black, fontSize = 20.sp, maxLines = 1, softWrap = false, letterSpacing = if (label == "NETFLIX") 1.5.sp else 0.sp)
+        Text(label, fontWeight = FontWeight.Black, fontSize = 17.sp, maxLines = 1, softWrap = false, letterSpacing = if (label == "NETFLIX") 1.sp else 0.sp)
     }
 }
 

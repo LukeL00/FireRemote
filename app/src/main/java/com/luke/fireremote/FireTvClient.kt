@@ -134,5 +134,6 @@ class FireTvClient(context: Context) {
             "com.google.android.youtube.tv",
         )
         val NETFLIX = listOf("com.netflix.ninja")
+        val DISNEY = listOf("com.disney.disneyplus")
     }
 }
