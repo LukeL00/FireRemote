@@ -21,7 +21,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -214,50 +221,78 @@ private fun RemoteScreen(client: FireTvClient) {
     }
 }
 
+/**
+ * A button that fires the moment your finger touches it (not on release),
+ * and optionally repeats while held - like a real remote.
+ */
+@Composable
+private fun PressSurface(
+    modifier: Modifier,
+    shape: Shape,
+    color: Color,
+    repeat: Boolean = false,
+    onPress: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    var pressed by remember { mutableStateOf(false) }
+    val currentOnPress by rememberUpdatedState(onPress)
+    val scope = rememberCoroutineScope()
+    Box(
+        modifier
+            .clip(shape)
+            .background(if (pressed) lerp(color, Color.White, 0.18f) else color)
+            .pointerInput(repeat) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    pressed = true
+                    currentOnPress()
+                    val repeater = if (repeat) scope.launch {
+                        delay(400)
+                        while (true) { currentOnPress(); delay(110) }
+                    } else null
+                    waitForUpOrCancellation()
+                    repeater?.cancel()
+                    pressed = false
+                }
+            },
+        contentAlignment = Alignment.Center,
+        content = content
+    )
+}
+
 @Composable
 private fun RoundButton(
     icon: ImageVector,
     label: String,
     tint: Color = Color.White,
     big: Boolean = false,
+    repeat: Boolean = false,
     onClick: () -> Unit
 ) {
     val size = if (big) 76.dp else 64.dp
-    FilledIconButton(
-        onClick = onClick,
-        modifier = Modifier.size(size),
-        shape = CircleShape,
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = if (big) Accent else Surface,
-            contentColor = if (big) Color.Black else tint
-        )
-    ) { Icon(icon, label, modifier = Modifier.size(if (big) 38.dp else 28.dp)) }
+    PressSurface(Modifier.size(size), CircleShape, if (big) Accent else Surface, repeat, onClick) {
+        Icon(icon, label, tint = if (big) Color.Black else tint, modifier = Modifier.size(if (big) 38.dp else 28.dp))
+    }
 }
 
 @Composable
 private fun PillButton(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(28.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Surface, contentColor = Color.White)
-    ) {
-        Icon(icon, null)
-        Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 16.sp)
+    PressSurface(modifier.height(56.dp), RoundedCornerShape(28.dp), Surface, repeat = true, onPress = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = Color.White)
+            Spacer(Modifier.width(8.dp))
+            Text(label, fontSize = 16.sp, color = Color.White)
+        }
     }
 }
 
 @Composable
 private fun AppButton(label: String, bg: Color, fg: Color, modifier: Modifier, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(64.dp),
-        shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(horizontal = 4.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = bg, contentColor = fg)
-    ) {
-        Text(label, fontWeight = FontWeight.Black, fontSize = 17.sp, maxLines = 1, softWrap = false, letterSpacing = if (label == "NETFLIX") 1.sp else 0.sp)
+    PressSurface(modifier.height(64.dp), RoundedCornerShape(16.dp), bg, onPress = onClick) {
+        Text(
+            label, color = fg, fontWeight = FontWeight.Black, fontSize = 17.sp, maxLines = 1, softWrap = false,
+            letterSpacing = if (label == "NETFLIX") 1.sp else 0.sp
+        )
     }
 }
 
@@ -267,25 +302,23 @@ private fun DPad(onUp: () -> Unit, onDown: () -> Unit, onLeft: () -> Unit, onRig
         Modifier.size(240.dp).clip(CircleShape).background(Surface),
         contentAlignment = Alignment.Center
     ) {
-        val arrow = Modifier.size(72.dp)
-        IconButton(onClick = onUp, modifier = arrow.align(Alignment.TopCenter)) {
-            Icon(Icons.Default.KeyboardArrowUp, "Up", tint = Color.White, modifier = Modifier.size(44.dp))
+        val arrow = Modifier.size(76.dp)
+        val iconMod = Modifier.size(44.dp)
+        PressSurface(arrow.align(Alignment.TopCenter), CircleShape, Surface, repeat = true, onPress = onUp) {
+            Icon(Icons.Default.KeyboardArrowUp, "Up", tint = Color.White, modifier = iconMod)
         }
-        IconButton(onClick = onDown, modifier = arrow.align(Alignment.BottomCenter)) {
-            Icon(Icons.Default.KeyboardArrowDown, "Down", tint = Color.White, modifier = Modifier.size(44.dp))
+        PressSurface(arrow.align(Alignment.BottomCenter), CircleShape, Surface, repeat = true, onPress = onDown) {
+            Icon(Icons.Default.KeyboardArrowDown, "Down", tint = Color.White, modifier = iconMod)
         }
-        IconButton(onClick = onLeft, modifier = arrow.align(Alignment.CenterStart)) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Left", tint = Color.White, modifier = Modifier.size(44.dp))
+        PressSurface(arrow.align(Alignment.CenterStart), CircleShape, Surface, repeat = true, onPress = onLeft) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Left", tint = Color.White, modifier = iconMod)
         }
-        IconButton(onClick = onRight, modifier = arrow.align(Alignment.CenterEnd)) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Right", tint = Color.White, modifier = Modifier.size(44.dp))
+        PressSurface(arrow.align(Alignment.CenterEnd), CircleShape, Surface, repeat = true, onPress = onRight) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Right", tint = Color.White, modifier = iconMod)
         }
-        Button(
-            onClick = onOk,
-            modifier = Modifier.size(96.dp),
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(containerColor = SurfaceHi, contentColor = Color.White)
-        ) { Text("OK", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+        PressSurface(Modifier.size(96.dp), CircleShape, SurfaceHi, onPress = onOk) {
+            Text("OK", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
     }
 }
 

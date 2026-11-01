@@ -6,6 +6,8 @@ import dadb.AdbStream
 import dadb.Dadb
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import java.util.concurrent.Executors
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.source
 import kotlinx.coroutines.sync.Mutex
@@ -35,12 +37,14 @@ class FireTvClient(private val context: Context) {
     // Fast path: a small program running on the Fire Stick that injects keys instantly
     @Volatile private var injector: AdbStream? = null
     private var injectorUnavailable = false
+    // One thread for key sends so rapid presses always arrive in order
+    private val keyDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
 
     suspend fun connect(ip: String): Result<Unit> = withContext(Dispatchers.IO) {
         lock.withLock {
             runCatching {
                 closeQuietly()
-                val d = Dadb.create(ip.trim(), 5555, keyPair)
+                val d = Dadb.create(ip.trim(), 5555, keyPair, connectTimeout = 5000, keepAlive = true)
                 // Forces the connection + auth handshake now rather than on first button press
                 val resp = d.execShell("echo ok")
                 check(resp.contains("ok")) { "Unexpected reply from Fire Stick: $resp" }
@@ -58,7 +62,7 @@ class FireTvClient(private val context: Context) {
     /** Send one Android key code (see Keys below). */
     suspend fun key(code: Int): Result<Unit> {
         injector?.let { stream ->
-            val sent = withContext(Dispatchers.IO) {
+            val sent = withContext(keyDispatcher) {
                 runCatching {
                     synchronized(stream) {
                         stream.sink.writeUtf8("$code\n")
@@ -153,7 +157,7 @@ class FireTvClient(private val context: Context) {
                 // Connection dropped (Wi-Fi blip, Fire Stick slept) - reconnect once and retry
                 closeQuietly()
                 val ip = host ?: throw it
-                val fresh = Dadb.create(ip, 5555, keyPair)
+                val fresh = Dadb.create(ip, 5555, keyPair, connectTimeout = 5000, keepAlive = true)
                 dadb = fresh
                 fresh.execShell(cmd)
             }.onFailure { closeQuietly() }

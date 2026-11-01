@@ -80,6 +80,7 @@ internal class DadbImpl @Throws(IllegalArgumentException::class) constructor(
     private fun newConnection(): Pair<AdbConnection, Socket> {
         val socketAddress = InetSocketAddress(host, port)
         val socket = Socket()
+        socket.tcpNoDelay = true // send each key press immediately (no Nagle batching)
         socket.soTimeout = socketTimeout
         socket.connect(socketAddress, connectTimeout)
         if (keepAlive) {
