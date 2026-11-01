@@ -1,6 +1,9 @@
 package com.luke.fireremote
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -50,11 +53,18 @@ private val NetflixRed = Color(0xFFE50914)
 private val DisneyBlue = Color(0xFF0B2A6F)
 
 class MainActivity : ComponentActivity() {
-    private lateinit var client: FireTvClient
+    private val client get() = (application as RemoteApp).client
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        client = FireTvClient(applicationContext)
+        // Lets the Quick Settings tile open the remote over the lock screen
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Bg, surface = Surface)) {
                 RemoteScreen(client)
@@ -62,9 +72,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        client.close()
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // Re-post the remote notification now that we're allowed to show it
+        if ((application as RemoteApp).savedIp.isNotBlank()) RemoteService.start(this)
     }
 }
 
@@ -88,8 +99,11 @@ private fun RemoteScreen(client: FireTvClient) {
         if (ip.isBlank()) { showSettings = true; return }
         status = Status.Connecting
         scope.launch {
-            client.connect(ip).fold(
-                onSuccess = { status = Status.Connected },
+            client.ensureConnected(ip).fold(
+                onSuccess = {
+                    status = Status.Connected
+                    RemoteService.start(context)
+                },
                 onFailure = { e ->
                     status = Status.Disconnected
                     val reason = generateSequence(e) { it.cause }.last().let { "${it.javaClass.simpleName}: ${it.message}" }

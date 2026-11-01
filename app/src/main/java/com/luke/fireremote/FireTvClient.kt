@@ -59,6 +59,10 @@ class FireTvClient(private val context: Context) {
 
     val isConnected: Boolean get() = dadb != null
 
+    /** Connects only if not already connected to this IP (shared by app, notification and tile). */
+    suspend fun ensureConnected(ip: String): Result<Unit> =
+        if (dadb != null && host == ip.trim()) Result.success(Unit) else connect(ip)
+
     /** Send one Android key code (see Keys below). */
     suspend fun key(code: Int): Result<Unit> {
         injector?.let { stream ->

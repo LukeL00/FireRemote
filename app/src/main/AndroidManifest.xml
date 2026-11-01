@@ -3,16 +3,42 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <application
+        android:name=".RemoteApp"
         android:label="Fire Remote"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity" android:exported="true"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".RemoteService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <receiver android:name=".KeyReceiver" android:exported="false" />
+
+        <service
+            android:name=".RemoteTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="Fire Remote"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
