@@ -26,6 +26,15 @@ jobs:
       - name: Point Gradle at the Android SDK
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
+      - name: Build fast key injector (runs on the Fire Stick)
+        run: |
+          PLATFORM=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -1)
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          mkdir -p injector/out app/src/main/assets
+          javac -source 8 -target 8 -nowarn -cp $PLATFORM/android.jar -d injector/out injector/src/com/luke/fireremote/Injector.java
+          $BT/d8 --min-api 21 --lib $PLATFORM/android.jar --output app/src/main/assets/injector.jar injector/out/com/luke/fireremote/Injector.class
+          ls -la app/src/main/assets
+
       - name: Build debug APK
         run: |
           set -o pipefail

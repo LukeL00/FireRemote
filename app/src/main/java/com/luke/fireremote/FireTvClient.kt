@@ -2,8 +2,12 @@ package com.luke.fireremote
 
 import android.content.Context
 import dadb.AdbKeyPair
+import dadb.AdbStream
 import dadb.Dadb
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withTimeoutOrNull
+import okio.source
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -14,7 +18,7 @@ import java.io.File
  * The first connection makes the Fire Stick show an "Allow debugging?" prompt
  * on the TV - tick "Always allow from this computer" and press OK.
  */
-class FireTvClient(context: Context) {
+class FireTvClient(private val context: Context) {
 
     private val keyPair: AdbKeyPair by lazy {
         val priv = File(context.filesDir, "adbkey")
@@ -28,6 +32,10 @@ class FireTvClient(context: Context) {
     private var host: String? = null
     private val packageCache = mutableMapOf<String, String>()
 
+    // Fast path: a small program running on the Fire Stick that injects keys instantly
+    @Volatile private var injector: AdbStream? = null
+    private var injectorUnavailable = false
+
     suspend fun connect(ip: String): Result<Unit> = withContext(Dispatchers.IO) {
         lock.withLock {
             runCatching {
@@ -39,6 +47,8 @@ class FireTvClient(context: Context) {
                 dadb = d
                 host = ip.trim()
                 packageCache.clear()
+                injectorUnavailable = false
+                startInjector(d)
             }.onFailure { closeQuietly() }
         }
     }
@@ -46,7 +56,60 @@ class FireTvClient(context: Context) {
     val isConnected: Boolean get() = dadb != null
 
     /** Send one Android key code (see Keys below). */
-    suspend fun key(code: Int): Result<Unit> = shell("input keyevent $code").map { }
+    suspend fun key(code: Int): Result<Unit> {
+        injector?.let { stream ->
+            val sent = withContext(Dispatchers.IO) {
+                runCatching {
+                    synchronized(stream) {
+                        stream.sink.writeUtf8("$code\n")
+                        stream.sink.flush()
+                    }
+                }.isSuccess
+            }
+            if (sent) return Result.success(Unit)
+            injector = null
+        }
+        // Slow path, then try to bring the fast path back for next time
+        val result = shell("input keyevent $code").map { }
+        if (result.isSuccess && injector == null && !injectorUnavailable) {
+            withContext(Dispatchers.IO) { lock.withLock { dadb?.let { startInjector(it) } } }
+        }
+        return result
+    }
+
+    /** Pushes the injector to the Fire Stick and starts it. Failure just means the slow path is used. */
+    private suspend fun startInjector(d: Dadb) {
+        runCatching { injector?.close() }
+        injector = null
+        val remote = "/data/local/tmp/fireremote-injector.jar"
+        runCatching {
+            val asset = runCatching { context.assets.open("injector.jar") }.getOrNull()
+            if (asset == null) { injectorUnavailable = true; return }
+            asset.source().use { d.push(it, remote, 420 /* 0644 */, System.currentTimeMillis()) }
+
+            val stream = d.open("shell:CLASSPATH=$remote app_process / com.luke.fireremote.Injector")
+            val ready = CompletableDeferred<Boolean>()
+            Thread {
+                try {
+                    while (true) {
+                        val line = stream.source.readUtf8Line() ?: break
+                        if (line.trim() == "READY") ready.complete(true)
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    ready.complete(false)
+                    if (injector === stream) injector = null
+                }
+            }.apply { isDaemon = true }.start()
+
+            if (withTimeoutOrNull(5000) { ready.await() } == true) {
+                injector = stream
+            } else {
+                runCatching { stream.close() }
+                injectorUnavailable = true
+            }
+        }.onFailure { injectorUnavailable = true }
+    }
 
     /** Type text into whatever search box is focused on the TV. */
     suspend fun typeText(text: String): Result<Unit> {
@@ -103,6 +166,8 @@ class FireTvClient(context: Context) {
         else open("shell:$cmd").use { it.source.readUtf8() }
 
     private fun closeQuietly() {
+        runCatching { injector?.close() }
+        injector = null
         runCatching { dadb?.close() }
         dadb = null
     }

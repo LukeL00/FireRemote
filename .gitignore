@@ -3,3 +3,5 @@ build/
 local.properties
 *.iml
 .idea/
+injector/out/
+app/src/main/assets/injector.jar
