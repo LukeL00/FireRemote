@@ -14,6 +14,15 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    // Fixed signing key so new builds install over the old one (no uninstall needed)
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
         release { isMinifyEnabled = false }
     }
