@@ -82,9 +82,10 @@ private fun RemoteScreen(client: FireTvClient) {
         scope.launch {
             client.connect(ip).fold(
                 onSuccess = { status = Status.Connected },
-                onFailure = {
+                onFailure = { e ->
                     status = Status.Disconnected
-                    toast("Couldn't connect. Check the IP, and accept the prompt on the TV.")
+                    val reason = generateSequence(e) { it.cause }.last().let { "${it.javaClass.simpleName}: ${it.message}" }
+                    Toast.makeText(context, "Couldn't connect to $ip\n$reason", Toast.LENGTH_LONG).show()
                 }
             )
         }
@@ -251,11 +252,7 @@ private fun AppButton(label: String, bg: Color, fg: Color, modifier: Modifier, o
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = bg, contentColor = fg)
     ) {
-        if (label == "YouTube") {
-            Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(26.dp))
-            Spacer(Modifier.width(6.dp))
-        }
-        Text(label, fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = if (label == "NETFLIX") 1.5.sp else 0.sp)
+        Text(label, fontWeight = FontWeight.Black, fontSize = 20.sp, maxLines = 1, softWrap = false, letterSpacing = if (label == "NETFLIX") 1.5.sp else 0.sp)
     }
 }
 
