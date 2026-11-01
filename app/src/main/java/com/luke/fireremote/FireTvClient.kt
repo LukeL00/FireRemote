@@ -34,8 +34,8 @@ class FireTvClient(context: Context) {
                 closeQuietly()
                 val d = Dadb.create(ip.trim(), 5555, keyPair)
                 // Forces the connection + auth handshake now rather than on first button press
-                val resp = d.shell("echo ok")
-                check(resp.output.contains("ok")) { "Unexpected reply from Fire Stick" }
+                val resp = d.execShell("echo ok")
+                check(resp.contains("ok")) { "Unexpected reply from Fire Stick: $resp" }
                 dadb = d
                 host = ip.trim()
                 packageCache.clear()
@@ -86,16 +86,21 @@ class FireTvClient(context: Context) {
     private suspend fun shell(cmd: String): Result<String> = withContext(Dispatchers.IO) {
         lock.withLock {
             val d = dadb ?: return@withLock Result.failure(IllegalStateException("Not connected"))
-            runCatching { d.shell(cmd).allOutput }.recoverCatching {
+            runCatching { d.execShell(cmd) }.recoverCatching {
                 // Connection dropped (Wi-Fi blip, Fire Stick slept) - reconnect once and retry
                 closeQuietly()
                 val ip = host ?: throw it
                 val fresh = Dadb.create(ip, 5555, keyPair)
                 dadb = fresh
-                fresh.shell(cmd).allOutput
+                fresh.execShell(cmd)
             }.onFailure { closeQuietly() }
         }
     }
+
+    /** Runs a shell command; uses the legacy shell protocol on older Fire OS. */
+    private fun Dadb.execShell(cmd: String): String =
+        if (supportsFeature("shell_v2")) shell(cmd).allOutput
+        else open("shell:$cmd").use { it.source.readUtf8() }
 
     private fun closeQuietly() {
         runCatching { dadb?.close() }

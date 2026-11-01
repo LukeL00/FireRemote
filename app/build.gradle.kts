@@ -27,7 +27,7 @@ android {
 }
 
 dependencies {
-    implementation("dev.mobile:dadb:1.2.10")
+    implementation("com.squareup.okio:okio:2.10.0")
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
